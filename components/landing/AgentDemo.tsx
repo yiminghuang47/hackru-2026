@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { VoiceOrb } from "./VoiceOrb";
+import { VoiceOrb } from "@/components/VoiceOrb";
 
 type Turn = { who: "agent" | "you"; text: string };
 
