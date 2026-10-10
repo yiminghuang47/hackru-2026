@@ -1,0 +1,28 @@
+{
+  "id": "valid-palindrome",
+  "title": "Valid Palindrome",
+  "topic": "Two Pointers",
+  "difficulty": "Easy",
+  "statement": "Given a string s, return true if it reads the same forward and backward after converting all uppercase letters to lowercase and removing every non-alphanumeric character. Otherwise return false.",
+  "examples": [
+    { "input": "s = \"A man, a plan, a canal: Panama\"", "output": "true", "explanation": "After cleaning it becomes \"amanaplanacanalpanama\", which is a palindrome." },
+    { "input": "s = \"race a car\"", "output": "false" },
+    { "input": "s = \" \"", "output": "true", "explanation": "The cleaned string is empty, which counts as a palindrome." }
+  ],
+  "constraints": ["1 <= s.length <= 2 * 10^5", "s consists of printable ASCII characters"],
+  "starterCode": {
+    "python": "class Solution:\n    def isPalindrome(self, s: str) -> bool:\n        pass\n",
+    "javascript": "/**\n * @param {string} s\n * @return {boolean}\n */\nfunction isPalindrome(s) {\n\n}\n",
+    "java": "class Solution {\n    public boolean isPalindrome(String s) {\n\n    }\n}\n",
+    "cpp": "class Solution {\npublic:\n    bool isPalindrome(string s) {\n\n    }\n};\n"
+  },
+  "edgeCases": ["empty after cleaning: \" \"", "single character: \"a\"", "only punctuation: \".,\"", "mixed case: \"Aa\"", "digits vs letters: \"0P\" -> false"],
+  "optimalComplexity": { "time": "O(n)", "space": "O(1)" },
+  "keyInsights": ["Use two pointers from both ends, skipping non-alphanumeric characters", "Compare case-insensitively without building a new string to get O(1) space"],
+  "referenceSolution": "def isPalindrome(s):\n    l, r = 0, len(s) - 1\n    while l < r:\n        while l < r and not s[l].isalnum(): l += 1\n        while l < r and not s[r].isalnum(): r -= 1\n        if s[l].lower() != s[r].lower(): return False\n        l += 1; r -= 1\n    return True",
+  "hintLadder": [
+    "Try tracing your approach on s = \"0P\". What should it return?",
+    "Do you need to build a cleaned copy of the string, or can you compare characters in place from both ends?",
+    "Put one pointer at each end, skip characters that aren't letters or digits, and compare lowercase versions as they move inward."
+  ]
+}

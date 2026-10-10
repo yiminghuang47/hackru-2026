@@ -1,0 +1,28 @@
+{
+  "id": "longest-substring-no-repeat",
+  "title": "Longest Substring Without Repeating Characters",
+  "topic": "Sliding Window",
+  "difficulty": "Medium",
+  "statement": "Given a string s, return the length of the longest substring that contains no repeated characters.",
+  "examples": [
+    { "input": "s = \"abcabcbb\"", "output": "3", "explanation": "\"abc\" is the longest substring with all distinct characters." },
+    { "input": "s = \"bbbbb\"", "output": "1" },
+    { "input": "s = \"pwwkew\"", "output": "3", "explanation": "\"wke\" works. \"pwke\" is a subsequence, not a substring." }
+  ],
+  "constraints": ["0 <= s.length <= 5 * 10^4", "s consists of English letters, digits, symbols and spaces"],
+  "starterCode": {
+    "python": "class Solution:\n    def lengthOfLongestSubstring(self, s: str) -> int:\n        pass\n",
+    "javascript": "/**\n * @param {string} s\n * @return {number}\n */\nfunction lengthOfLongestSubstring(s) {\n\n}\n",
+    "java": "class Solution {\n    public int lengthOfLongestSubstring(String s) {\n\n    }\n}\n",
+    "cpp": "class Solution {\npublic:\n    int lengthOfLongestSubstring(string s) {\n\n    }\n};\n"
+  },
+  "edgeCases": ["empty string: \"\"", "single char: \"a\"", "repeat jumps the left pointer backward if done wrong: \"abba\"", "spaces count as characters: \"a b\""],
+  "optimalComplexity": { "time": "O(n)", "space": "O(min(n, alphabet))" },
+  "keyInsights": ["Keep a window [left, right] with no duplicates", "Store each character's last index; on a repeat, move left to max(left, lastIndex + 1) so it never moves backward"],
+  "referenceSolution": "def lengthOfLongestSubstring(s):\n    last, left, best = {}, 0, 0\n    for right, ch in enumerate(s):\n        if ch in last and last[ch] >= left:\n            left = last[ch] + 1\n        last[ch] = right\n        best = max(best, right - left + 1)\n    return best",
+  "hintLadder": [
+    "Try tracing your approach on s = \"abba\". What does your left boundary do at the final 'a'?",
+    "Instead of checking every substring, can you keep a window that always has distinct characters and slide it?",
+    "Track each character's most recent index. When you see a repeat inside the window, jump left to just past that index, but never move left backward."
+  ]
+}

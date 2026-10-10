@@ -1,0 +1,27 @@
+{
+  "id": "container-with-most-water",
+  "title": "Container With Most Water",
+  "topic": "Two Pointers",
+  "difficulty": "Medium",
+  "statement": "You are given an integer array height of length n. Picture n vertical lines where line i goes from (i, 0) to (i, height[i]). Choose two lines that, together with the x-axis, form a container holding the most water. Return the maximum amount of water the container can store. The container cannot be tilted.",
+  "examples": [
+    { "input": "height = [1,8,6,2,5,4,8,3,7]", "output": "49", "explanation": "Lines at index 1 (height 8) and index 8 (height 7) give min(8,7) * (8-1) = 49." },
+    { "input": "height = [1,1]", "output": "1" }
+  ],
+  "constraints": ["2 <= n <= 10^5", "0 <= height[i] <= 10^4"],
+  "starterCode": {
+    "python": "class Solution:\n    def maxArea(self, height: list[int]) -> int:\n        pass\n",
+    "javascript": "/**\n * @param {number[]} height\n * @return {number}\n */\nfunction maxArea(height) {\n\n}\n",
+    "java": "class Solution {\n    public int maxArea(int[] height) {\n\n    }\n}\n",
+    "cpp": "class Solution {\npublic:\n    int maxArea(vector<int>& height) {\n\n    }\n};\n"
+  },
+  "edgeCases": ["two elements: [1,1]", "all zeros: [0,0,0]", "strictly increasing: [1,2,3,4,5]", "tallest lines in the middle: [1,100,100,1]"],
+  "optimalComplexity": { "time": "O(n)", "space": "O(1)" },
+  "keyInsights": ["Start with the widest container (pointers at both ends)", "Area is limited by the shorter line, so always move the pointer at the shorter line inward; moving the taller one can never help"],
+  "referenceSolution": "def maxArea(height):\n    l, r, best = 0, len(height) - 1, 0\n    while l < r:\n        best = max(best, min(height[l], height[r]) * (r - l))\n        if height[l] < height[r]: l += 1\n        else: r -= 1\n    return best",
+  "hintLadder": [
+    "Try computing the answer by hand for height = [1,8,6,2,5,4,8,3,7]. Which pair wins, and why?",
+    "Start with the widest possible container. If you shrink the width, what has to happen for the area to get bigger?",
+    "Keep one pointer at each end and always move the pointer at the shorter line inward, tracking the best area so far."
+  ]
+}

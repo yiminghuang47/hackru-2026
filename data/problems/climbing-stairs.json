@@ -1,0 +1,27 @@
+{
+  "id": "climbing-stairs",
+  "title": "Climbing Stairs",
+  "topic": "Dynamic Programming",
+  "difficulty": "Easy",
+  "statement": "You are climbing a staircase with n steps. Each move, you can climb either 1 or 2 steps. Return the number of distinct ways to reach the top.",
+  "examples": [
+    { "input": "n = 2", "output": "2", "explanation": "1+1 or 2." },
+    { "input": "n = 3", "output": "3", "explanation": "1+1+1, 1+2, or 2+1." }
+  ],
+  "constraints": ["1 <= n <= 45"],
+  "starterCode": {
+    "python": "class Solution:\n    def climbStairs(self, n: int) -> int:\n        pass\n",
+    "javascript": "/**\n * @param {number} n\n * @return {number}\n */\nfunction climbStairs(n) {\n\n}\n",
+    "java": "class Solution {\n    public int climbStairs(int n) {\n\n    }\n}\n",
+    "cpp": "class Solution {\npublic:\n    int climbStairs(int n) {\n\n    }\n};\n"
+  },
+  "edgeCases": ["n = 1", "n = 2", "n = 45 (naive recursion is too slow)"],
+  "optimalComplexity": { "time": "O(n)", "space": "O(1)" },
+  "keyInsights": ["ways(n) = ways(n-1) + ways(n-2), since the last move is either 1 or 2 steps", "Only the previous two values are needed, so space can be O(1)"],
+  "referenceSolution": "def climbStairs(n):\n    a, b = 1, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a",
+  "hintLadder": [
+    "Write out the answers for n = 1, 2, 3, 4, 5. Do you see a pattern?",
+    "Think about the very last move you make to reach step n. Where could you have been just before it?",
+    "ways(n) = ways(n-1) + ways(n-2). Build it bottom-up, keeping only the last two values."
+  ]
+}

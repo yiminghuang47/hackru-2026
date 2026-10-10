@@ -1,0 +1,27 @@
+{
+  "id": "house-robber",
+  "title": "House Robber",
+  "topic": "Dynamic Programming",
+  "difficulty": "Medium",
+  "statement": "Houses along a street each hold some amount of money, given by the array nums. You can't take from two adjacent houses on the same night. Return the maximum amount of money you can collect.",
+  "examples": [
+    { "input": "nums = [1,2,3,1]", "output": "4", "explanation": "Take houses 0 and 2: 1 + 3 = 4." },
+    { "input": "nums = [2,7,9,3,1]", "output": "12", "explanation": "Take houses 0, 2 and 4: 2 + 9 + 1 = 12." }
+  ],
+  "constraints": ["1 <= nums.length <= 100", "0 <= nums[i] <= 400"],
+  "starterCode": {
+    "python": "class Solution:\n    def rob(self, nums: list[int]) -> int:\n        pass\n",
+    "javascript": "/**\n * @param {number[]} nums\n * @return {number}\n */\nfunction rob(nums) {\n\n}\n",
+    "java": "class Solution {\n    public int rob(int[] nums) {\n\n    }\n}\n",
+    "cpp": "class Solution {\npublic:\n    int rob(vector<int>& nums) {\n\n    }\n};\n"
+  },
+  "edgeCases": ["single house: [5]", "two houses: [2,1]", "skipping two in a row is optimal: [2,1,1,2]", "all zeros"],
+  "optimalComplexity": { "time": "O(n)", "space": "O(1)" },
+  "keyInsights": ["At each house, either skip it (best up to i-1) or take it (nums[i] + best up to i-2)", "Greedy 'take every other house' fails, e.g. [2,1,1,2]"],
+  "referenceSolution": "def rob(nums):\n    prev, cur = 0, 0\n    for x in nums:\n        prev, cur = cur, max(cur, prev + x)\n    return cur",
+  "hintLadder": [
+    "Try your approach on nums = [2,1,1,2]. Does taking every other house give the best answer?",
+    "At house i you have two choices: take it or skip it. What does each choice mean for house i-1?",
+    "best(i) = max(best(i-1), nums[i] + best(i-2)). Iterate once, keeping only the last two values."
+  ]
+}
