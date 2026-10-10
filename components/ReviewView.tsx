@@ -4,6 +4,8 @@ import { use } from "react";
 import Link from "next/link";
 import { useSessionStore, useStoreHydrated } from "@/lib/session";
 import { LANGUAGE_LABELS } from "@/lib/types";
+import { useScorecard } from "@/lib/useScorecard";
+import { ScorecardView } from "@/components/ScorecardView";
 import { TranscriptPanel } from "@/components/TranscriptPanel";
 
 function formatDuration(ms: number) {
@@ -12,11 +14,12 @@ function formatDuration(ms: number) {
   return `${m}m ${s}s`;
 }
 
-// Placeholder review. Gemini scoring and the scorecard arrive in milestone 5.
+/** The page after "I'm done": the Gemini scorecard, then the final code and transcript. */
 export function ReviewView({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const hydrated = useStoreHydrated();
   const session = useSessionStore((s) => s.sessions[id]);
+  const { error, retry } = useScorecard(session);
 
   if (!hydrated) return null;
 
@@ -31,7 +34,7 @@ export function ReviewView({ params }: { params: Promise<{ id: string }> }) {
     );
   }
 
-  const { problem, config } = session;
+  const { problem, config, scorecard } = session;
   const duration = session.endedAt ? formatDuration(session.endedAt - session.startedAt) : "In progress";
 
   return (
@@ -52,8 +55,32 @@ export function ReviewView({ params }: { params: Promise<{ id: string }> }) {
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Time" value={duration} />
         <Stat label="Hints used" value={`${session.hintsUsed} / ${problem.hintLadder.length}`} />
-        <Stat label="Score" value="Coming soon" />
+        <Stat label="Score" value={scorecard ? `${scorecard.overall} / 100` : "—"} />
       </div>
+
+      {scorecard ? (
+        <ScorecardView scorecard={scorecard} />
+      ) : !session.endedAt ? (
+        <Notice>
+          This interview is still in progress.{" "}
+          <Link href={`/interview/${id}`} className="text-emerald-400 hover:underline">
+            Go back to it
+          </Link>{" "}
+          and press &quot;I&apos;m done&quot; to get your score.
+        </Notice>
+      ) : error ? (
+        <Notice>
+          <span className="text-rose-400">{error}</span>{" "}
+          <button type="button" onClick={retry} className="text-emerald-400 hover:underline">
+            Try again
+          </button>
+        </Notice>
+      ) : (
+        <Notice>
+          <span className="animate-pulse">Scoring your interview…</span> This reads your transcript
+          and final code, and usually takes a few seconds.
+        </Notice>
+      )}
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-zinc-300">Your final code</h2>
@@ -69,6 +96,14 @@ export function ReviewView({ params }: { params: Promise<{ id: string }> }) {
         </div>
       </section>
     </main>
+  );
+}
+
+function Notice({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="rounded-xl border border-zinc-800 p-6 text-sm text-zinc-300" role="status">
+      {children}
+    </p>
   );
 }
 

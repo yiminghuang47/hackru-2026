@@ -2,7 +2,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 
-export const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+export const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite";
 
 let client: GoogleGenAI | undefined;
 

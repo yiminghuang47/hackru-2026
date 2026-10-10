@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Scorecard } from "./scorecard";
 
 export const TOPICS = [
   "Two Pointers",
@@ -96,4 +97,6 @@ export type Session = {
   hintsUsed: number;
   startedAt: number;
   endedAt?: number;
+  /** Set once `/api/result` has scored the finished interview. */
+  scorecard?: Scorecard;
 };
