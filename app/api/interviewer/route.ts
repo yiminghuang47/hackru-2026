@@ -6,7 +6,6 @@ import {
 } from "@/lib/interviewer";
 import { interviewerPrompt, interviewerSystemPrompt } from "@/lib/interviewer-prompts";
 
-export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MAX_BODY_BYTES = 256 * 1024;

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSessionStore, useStoreHydrated } from "@/lib/session";
 import { useVoice } from "@/lib/voice";
+import { useInterview } from "@/lib/useInterview";
 import { LANGUAGE_LABELS } from "@/lib/types";
 import { ProblemPanel } from "@/components/ProblemPanel";
 import { CodeEditor } from "@/components/CodeEditor";
@@ -30,7 +31,6 @@ export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
   const hydrated = useStoreHydrated();
   const session = useSessionStore((s) => s.sessions[id]);
   const updateCode = useSessionStore((s) => s.updateCode);
-  const addTranscript = useSessionStore((s) => s.addTranscript);
   const recordHint = useSessionStore((s) => s.recordHint);
   const endSession = useSessionStore((s) => s.endSession);
 
@@ -40,9 +40,19 @@ export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
   const [interviewerHidden, setInterviewerHidden] = useState(false);
   const dragStartWidth = useRef(0);
 
-  const voice = useVoice({
-    onUtterance: (text) => addTranscript(id, { role: "candidate", text }),
-  });
+  const [draft, setDraft] = useState("");
+  const interview = useInterview(id);
+  const voice = useVoice({ onUtterance: (text) => { void interview.send(text); } });
+  const busy = interview.phase !== "idle" || voice.state !== "idle";
+  const micState = voice.state !== "idle" ? voice.state
+    : interview.phase === "speaking" ? "interviewer"
+    : interview.phase !== "idle" ? "thinking" : "idle";
+
+  function cancelTurn() { voice.stop(); interview.stop(); }
+  function toggleMic() {
+    if (interview.phase === "speaking") interview.stop();
+    voice.toggleRecording();
+  }
 
   if (!hydrated) return null;
 
@@ -60,12 +70,9 @@ export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
   const { problem, config } = session;
   const hintsLeft = problem.hintLadder.length - session.hintsUsed;
 
-  // Placeholder: reads the problem's static hint ladder. Gemini takes over in milestone 2.
-  function requestHint() {
-    if (hintsLeft <= 0) return;
-    addTranscript(id, { role: "candidate", text: "Can I get a hint?" });
-    addTranscript(id, { role: "interviewer", text: problem.hintLadder[session.hintsUsed] });
-    recordHint(id);
+  async function requestHint() {
+    if (hintsLeft <= 0 || busy) return;
+    if (await interview.send("Can I get a hint?")) recordHint(id);
   }
 
   function dragInterviewer(dx: number) {
@@ -83,12 +90,13 @@ export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
     : `${leftWidth}px 9px minmax(0,1fr) 9px ${rightWidth}px`;
 
   function finish() {
+    cancelTurn();
     endSession(id);
     router.push(`/review/${id}`);
   }
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex min-h-screen flex-col lg:h-screen">
       <header className="flex items-center justify-between gap-4 border-b border-zinc-800 px-4 py-2">
         <div className="flex min-w-0 items-center gap-3 text-sm">
           <Link href="/" className="font-semibold text-zinc-200 hover:text-white">
@@ -111,7 +119,7 @@ export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
       </header>
 
       <div
-        className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-(--room-columns)"
+        className="grid flex-1 grid-cols-1 lg:min-h-0 lg:grid-cols-(--room-columns)"
         style={{ "--room-columns": columns } as React.CSSProperties}
       >
         <aside className="flex min-h-0 min-w-0 flex-col">
@@ -174,22 +182,58 @@ export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
             <InterviewerPanel
               voiceId={config.voiceId}
               tone={config.tone}
-              transcript={session.transcript}
-              startedAt={session.startedAt}
-              mic={{ state: voice.state, error: voice.error, stream: voice.stream, onClick: voice.toggleRecording }}
+              speaking={interview.phase === "speaking"}
+              mic={{ state: micState, error: voice.error, stream: voice.stream, onClick: session.endedAt ? undefined : toggleMic }}
             />
           </div>
           <p className="px-4 pt-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
             Transcript
           </p>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="max-h-80 min-h-0 flex-1 overflow-y-auto lg:max-h-none">
             <TranscriptPanel transcript={session.transcript} />
           </div>
-          <div className="border-t border-zinc-800 p-3">
+          <div className="space-y-3 border-t border-zinc-800 p-3">
+            <div aria-live="polite" role="status" className="text-xs text-zinc-400">
+              {interview.phase === "thinking" && "Thinking about your answer…"}
+              {interview.phase === "loading-audio" && "Preparing the interviewer's voice…"}
+              {session.endedAt && "This interview has ended. Start a new interview to continue."}
+            </div>
+            {interview.error && (
+              <div role="alert" className="space-y-2 text-sm text-red-300">
+                <p>{interview.error}</p>
+                {interview.retryKind && <button type="button" disabled={busy || !!session.endedAt}
+                  onClick={() => { void interview.retry(); }} className="rounded border border-zinc-600 px-3 py-1 text-zinc-100 disabled:opacity-40">
+                  {interview.retryKind === "turn" ? "Retry reply" : "Play reply"}
+                </button>}
+              </div>
+            )}
+            {busy && <button type="button" onClick={cancelTurn} className="text-sm text-zinc-300 underline">
+              {interview.phase === "speaking" ? "Stop audio" : "Cancel turn"}
+            </button>}
+            {session.transcript.length === 0 && <button type="button" disabled={busy || !!session.endedAt}
+              onClick={() => { void interview.send("I'm ready. Please introduce the problem and ask me how I would approach it."); }}
+              className="w-full rounded-md bg-emerald-500 px-3 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-40">
+              Start interview
+            </button>}
+            <form className="space-y-2" onSubmit={(event) => {
+              event.preventDefault();
+              if (busy || !draft.trim() || session.endedAt) return;
+              void interview.send(draft); setDraft("");
+            }}>
+              <label htmlFor="typed-answer" className="text-xs text-zinc-400">Or type your answer</label>
+              <textarea id="typed-answer" rows={2} maxLength={8000} value={draft}
+                onChange={(event) => setDraft(event.target.value)} disabled={!!session.endedAt}
+                placeholder="Explain your approach or ask a question…"
+                className="w-full resize-y rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100" />
+              <button type="submit" disabled={busy || !draft.trim() || !!session.endedAt}
+                className="w-full rounded-md bg-zinc-100 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-40">
+                Send answer
+              </button>
+            </form>
             <button
               type="button"
               onClick={requestHint}
-              disabled={hintsLeft <= 0}
+              disabled={hintsLeft <= 0 || busy || !!session.endedAt}
               className="w-full rounded-md border border-zinc-700 py-2 text-sm hover:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Can I get a hint? <span className="text-zinc-500">({hintsLeft} left)</span>
