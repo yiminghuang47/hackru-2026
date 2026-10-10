@@ -9,7 +9,7 @@ import { ProblemPanel } from "@/components/ProblemPanel";
 import { CodeEditor } from "@/components/CodeEditor";
 import { Timer } from "@/components/Timer";
 import { TranscriptPanel } from "@/components/TranscriptPanel";
-import { VadIndicator } from "@/components/VadIndicator";
+import { MicButton } from "@/components/MicButton";
 
 export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -88,8 +88,8 @@ export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
 
         <aside className="flex min-h-0 flex-col border-zinc-800 lg:border-l">
           <div className="border-b border-zinc-800 px-4 py-3">
-            {/* The mic is always on with VAD. Wired up in milestone 3. */}
-            <VadIndicator state="idle" />
+            {/* Click-to-talk mic. Wired to useVoice() in milestone 4. */}
+            <MicButton state="idle" />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             <TranscriptPanel transcript={session.transcript} />

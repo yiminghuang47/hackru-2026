@@ -68,6 +68,11 @@ export type ParseQuestionResponse =
   | { ok: true; problem: Problem }
   | { ok: false; reason: string };
 
+/** `/api/stt`: one recorded candidate turn → text. Empty `text` means no speech was found. */
+export type SttResponse =
+  | { ok: true; text: string }
+  | { ok: false; reason: string };
+
 export type SessionConfig = {
   topic: string; // one of TOPICS or a custom "Other" topic
   difficulty: Difficulty;
