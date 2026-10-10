@@ -9,7 +9,7 @@ const STATES: Record<MicState, { label: string; dot: string }> = {
 
 /**
  * Click-to-talk mic. The first click starts recording, the second stops it and sends the turn.
- * Driven by `useVoice()` in milestone 4; disabled until an `onClick` is passed.
+ * Driven by `useVoice()` in `lib/voice.ts`; disabled until an `onClick` is passed.
  */
 export function MicButton({ state, onClick }: { state: MicState; onClick?: () => void }) {
   const { label, dot } = STATES[state];

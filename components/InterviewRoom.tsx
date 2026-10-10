@@ -4,6 +4,7 @@ import { use, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSessionStore, useStoreHydrated } from "@/lib/session";
+import { useVoice } from "@/lib/voice";
 import { LANGUAGE_LABELS } from "@/lib/types";
 import { ProblemPanel } from "@/components/ProblemPanel";
 import { CodeEditor } from "@/components/CodeEditor";
@@ -38,6 +39,10 @@ export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
   const [rightWidth, setRightWidth] = useState(RIGHT_DEFAULT);
   const [interviewerHidden, setInterviewerHidden] = useState(false);
   const dragStartWidth = useRef(0);
+
+  const voice = useVoice({
+    onUtterance: (text) => addTranscript(id, { role: "candidate", text }),
+  });
 
   if (!hydrated) return null;
 
@@ -171,6 +176,7 @@ export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
               tone={config.tone}
               transcript={session.transcript}
               startedAt={session.startedAt}
+              mic={{ state: voice.state, error: voice.error, stream: voice.stream, onClick: voice.toggleRecording }}
             />
           </div>
           <p className="px-4 pt-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">

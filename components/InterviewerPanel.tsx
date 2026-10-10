@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import type { Tone, TranscriptEntry } from "@/lib/types";
 import { VOICES } from "@/lib/voices";
 import { VoiceOrb } from "@/components/VoiceOrb";
-import { MicButton } from "@/components/MicButton";
+import { MicButton, type MicState } from "@/components/MicButton";
+import { MicLevel } from "@/components/MicLevel";
 
 // Rough speaking time for a line until real TTS playback drives this (milestone 3).
 const MS_PER_CHAR = 55;
@@ -42,11 +43,13 @@ export function InterviewerPanel({
   tone,
   transcript,
   startedAt,
+  mic,
 }: {
   voiceId: string;
   tone: Tone;
   transcript: TranscriptEntry[];
   startedAt: number;
+  mic: { state: MicState; error: string | null; stream: MediaStream | null; onClick: () => void };
 }) {
   const speaking = useInterviewerSpeaking(transcript, startedAt);
   const name = VOICES.find((v) => v.id === voiceId)?.name ?? "Interviewer";
@@ -57,8 +60,14 @@ export function InterviewerPanel({
       <p className="-mt-2 font-medium text-zinc-100">{name}</p>
       <p className="text-xs text-zinc-500">{tone} interviewer</p>
       <div className="mt-3 w-full">
-        {/* Click-to-talk mic. Wired to useVoice() in milestone 4. */}
-        <MicButton state={speaking ? "interviewer" : "idle"} />
+        {/* Click-to-talk mic. Clicking while the interviewer talks starts the candidate's turn. */}
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <MicButton state={mic.state === "idle" && speaking ? "interviewer" : mic.state} onClick={mic.onClick} />
+          </div>
+          <MicLevel stream={mic.stream} />
+        </div>
+        {mic.error && <p className="mt-2 text-xs text-red-400">{mic.error}</p>}
       </div>
     </div>
   );
