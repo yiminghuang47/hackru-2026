@@ -130,7 +130,7 @@ export function Cursor() {
         <svg viewBox="0 0 24 24" width={SIZE} height={SIZE} className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
           <path
             d="M4.5 4.5 L20.5 9.8 C21.6 10.2 21.5 11.2 20.4 11.5 L14.8 12.8 L12.2 19.8 C11.8 20.9 10.8 20.8 10.4 19.8 Z"
-            fill="#0d0d0c"
+            fill="#070c1d"
             stroke="#fff"
             strokeWidth="1.9"
             strokeLinejoin="round"

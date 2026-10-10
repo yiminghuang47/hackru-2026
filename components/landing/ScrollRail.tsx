@@ -73,7 +73,7 @@ export function ScrollRail({ sections }: { sections: RailSection[] }) {
           style={{ height: `${progress * 100}%` }}
         />
         <div
-          className="absolute -left-[3px] h-[7px] w-[7px] rounded-full bg-accent shadow-[0_0_12px_2px_rgba(255,180,84,0.6)]"
+          className="absolute -left-[3px] h-[7px] w-[7px] rounded-full bg-accent shadow-[0_0_12px_2px_rgba(79,141,255,0.6)]"
           style={{ top: `calc(${progress * 100}% - 3px)` }}
         />
       </div>

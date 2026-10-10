@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
-/* The app is dark-only, like an IDE. Warm ink + one amber accent. */
+/* The app is dark-only, like an IDE. Dark navy with one bright blue accent. */
 :root {
-  --background: #0d0d0c;
-  --foreground: #f3f0e8;
-  --accent: #ffb454;
+  --background: #000000;
+  --foreground: #eef2fb;
+  --accent: #4f8dff;
   color-scheme: dark;
 }
 
@@ -12,31 +12,31 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-accent: var(--accent);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-dm-sans);
   --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-instrument-serif);
+  --font-display: var(--font-newsreader);
 }
 
 /*
  * Retheme the palette the older components (editor, forms, review) already use,
- * so they match the landing page without being edited: zinc becomes warm ink,
- * emerald becomes the amber accent.
+ * so they match the landing page without being edited: zinc becomes navy-tinted grey,
+ * emerald becomes the blue accent.
  */
 @theme {
-  --color-zinc-100: #f3f0e8;
-  --color-zinc-200: #e2ded3;
-  --color-zinc-300: #c9c4b7;
-  --color-zinc-400: #a29d90;
-  --color-zinc-500: #7d796e;
-  --color-zinc-600: #5a574f;
-  --color-zinc-700: #3b3934;
-  --color-zinc-800: #272622;
-  --color-zinc-900: #181816;
-  --color-zinc-950: #0d0d0c;
-  --color-emerald-200: #ffe3bd;
-  --color-emerald-300: #ffd08a;
-  --color-emerald-400: #ffb454;
-  --color-emerald-500: #ff9f2e;
+  --color-zinc-100: #eef2fb;
+  --color-zinc-200: #d6dcec;
+  --color-zinc-300: #b6bfd6;
+  --color-zinc-400: #8d98b5;
+  --color-zinc-500: #677392;
+  --color-zinc-600: #46516f;
+  --color-zinc-700: #2a3452;
+  --color-zinc-800: #19223c;
+  --color-zinc-900: #0e152b;
+  --color-zinc-950: #070c1d;
+  --color-emerald-200: #cfe0ff;
+  --color-emerald-300: #9dbfff;
+  --color-emerald-400: #4f8dff;
+  --color-emerald-500: #2f6ff0;
 }
 
 html {
@@ -51,12 +51,12 @@ html::-webkit-scrollbar {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
 }
 
 ::selection {
   background: var(--accent);
-  color: #0d0d0c;
+  color: #070c1d;
 }
 
 /* Scroll-in reveal, toggled by <Reveal />. */
@@ -101,3 +101,5 @@ html.custom-cursor input,
 html.custom-cursor textarea {
   cursor: text !important;
 }
+
+
