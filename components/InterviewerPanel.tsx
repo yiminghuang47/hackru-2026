@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { Tone, TranscriptEntry } from "@/lib/types";
 import { VOICES } from "@/lib/voices";
 import { VoiceOrb } from "@/components/VoiceOrb";
-import { VadIndicator } from "@/components/VadIndicator";
+import { MicButton } from "@/components/MicButton";
 
 // Rough speaking time for a line until real TTS playback drives this (milestone 3).
 const MS_PER_CHAR = 55;
@@ -56,9 +56,9 @@ export function InterviewerPanel({
       <VoiceOrb speaking={speaking} size={200} />
       <p className="-mt-2 font-medium text-zinc-100">{name}</p>
       <p className="text-xs text-zinc-500">{tone} interviewer</p>
-      <div className="mt-3">
-        {/* The mic is always on with VAD. Wired up in milestone 3. */}
-        <VadIndicator state={speaking ? "interviewer" : "idle"} />
+      <div className="mt-3 w-full">
+        {/* Click-to-talk mic. Wired to useVoice() in milestone 4. */}
+        <MicButton state={speaking ? "interviewer" : "idle"} />
       </div>
     </div>
   );

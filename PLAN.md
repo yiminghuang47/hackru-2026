@@ -13,7 +13,7 @@ Optional extras: a session recording, and Presage-based feedback on presence and
 - Next.js (App Router) + TypeScript, Tailwind
 - **LLM:** Gemini (`@google/genai`, Gemini Flash for low latency)
 - **Voice:** ElevenLabs. TTS for the interviewer, Scribe for the candidate's speech-to-text.
-- **VAD:** `@ricky0123/vad-web` (Silero VAD in the browser)
+- **Mic capture:** `MediaRecorder` in the browser (click to record, click to stop)
 - **Editor:** Monaco
 
 **No code execution.** The code is never run. Gemini reads the code and reasons about its correctness, edge cases and complexity, the way a human interviewer does when the candidate traces through examples.
@@ -30,31 +30,36 @@ Optional extras: a session recording, and Presage-based feedback on presence and
 3. **Interview room** (`/interview/[id]`)
    - Left: problem statement and examples.
    - Center: Monaco editor with a **"I'm done"** button.
-   - Right: live transcript, a VAD status indicator (listening / you're speaking / interviewer speaking), an **"Can I get a hint?"** button and a timer.
-   - **The mic is always on. There is no toggle and no push-to-talk.** VAD finds the speech segments.
+   - Right: live transcript, a **mic button** with a status label (ready / recording / thinking / interviewer speaking), an **"Can I get a hint?"** button and a timer.
+   - **Click-to-talk:** the first click on the mic button starts recording, and the second click stops it and sends the turn. The mic is off between turns.
 4. **Review page** (`/review/[id]`): scorecard, transcript and final code.
 
-## Voice pipeline (always-on mic + VAD)
-- Use `getUserMedia` with `echoCancellation`, `noiseSuppression` and `autoGainControl` turned on, so the interviewer's TTS isn't picked up as candidate speech.
-- `MicVAD` (vad-web) runs for the whole interview:
-  - `onSpeechStart` marks the candidate as talking. If the interviewer is mid-sentence, stop TTS playback (barge-in) so the candidate can interrupt naturally.
-  - `onSpeechEnd(audio)` encodes the Float32 segment to WAV and POSTs it to `/api/stt` (ElevenLabs Scribe). The transcript text is appended to the live transcript.
-- **Echo guard:** while the interviewer audio is playing, ignore VAD segments shorter than about 600ms and raise the speech threshold, so TTS bleed-through doesn't trigger false barge-ins.
-- VAD tuning: `positiveSpeechThreshold` about 0.6, `redemptionFrames` set for about 800ms of trailing silence, so short thinking pauses inside a sentence don't split the utterance. `minSpeechFrames` filters out coughs and keyboard clicks.
-- Each transcribed utterance goes to the `InterjectionController` as a "candidate spoke" event.
+## Voice pipeline (click-to-talk)
+```
+First click  → start recording
+Second click → stop recording
+  → /api/stt         → show candidate transcript
+  → /api/interviewer → show interviewer reply
+  → /api/tts         → play interviewer audio
+```
+- **First click:** `getUserMedia` (with `echoCancellation`, `noiseSuppression` and `autoGainControl` on) plus `MediaRecorder` start capturing. If the interviewer is mid-sentence, stop TTS playback first (barge-in), so clicking the mic is how the candidate interrupts.
+- **Second click:** stop the recorder and POST the audio blob (webm/ogg as recorded; no WAV encoding needed) to `/api/stt` (ElevenLabs Scribe). Append the returned text to the transcript as a candidate turn. Ignore recordings under about 300ms or with empty text, so accidental double-clicks don't create turns.
+- **Reply:** the turn goes to the `InterjectionController` as a "candidate spoke" event, which always calls `/api/interviewer` for it (a candidate turn is never throttled). If Gemini returns `speak:true`, append the `message` to the transcript and send it to `/api/tts`. Gemini may still return `speak:false` when the candidate is just thinking out loud.
+- The mic is released between turns, so there is no echo guard or VAD tuning to do: the interviewer's audio can't be recorded unless the candidate is recording at the same time.
+- The mic button is disabled while a turn is being transcribed or answered ("thinking"), so turns can't overlap.
 
 ## Core design: throttled interviewer interjections
 The interviewer must not nag. A client-side `InterjectionController` decides *when* to call the LLM, and the LLM decides *what* to say.
 - **Trigger events:**
-  - a candidate utterance ends (it gets an immediate reply if it's a direct question, otherwise it counts as a candidate for a probe)
+  - the candidate finishes a recorded turn (always sent to the interviewer; Gemini answers or stays quiet)
   - a large code change after 60s or more of stable code
   - the candidate says "done" / "I think that's it", or presses "I'm done"
   - no speech or typing for 3 minutes or more (gentle check-in)
 - **Throttles:**
   - minimum **90s cooldown** between unsolicited interjections
-  - no interjection while the candidate is typing or talking. The VAD speaking state plus about 8s of typing debounce cover this.
-  - at most around 1 interjection per 3–4 minutes on average
-  - direct questions from the candidate and hint requests always get a response
+  - no unsolicited interjection while the candidate is recording or typing. The mic's recording state plus about 8s of typing debounce cover this.
+  - at most around 1 unsolicited interjection per 3–4 minutes on average
+  - the cooldown and limits apply only to unsolicited interjections (code change, idle). Candidate turns and hint requests always go to Gemini.
 - **LLM decision:** each trigger sends `{problem, code snapshot, recent transcript, elapsed time, hints used, tone}` to `/api/interviewer`. Gemini returns JSON `{ speak: boolean, message, kind: "probe"|"answer"|"hint"|"checkin"|"wrapup" }`.
   - Example probes: "Why did you choose a hashmap?", "Is this optimal?", "Are you sure about that edge case?", "Can you walk me through it with this input?"
   - `speak:false` is an expected outcome that lets the candidate keep thinking.
@@ -111,14 +116,14 @@ app/
   api/problem/generate/route.ts # custom-topic problem generation
   api/problem/parse/route.ts    # custom question text -> full Problem (Gemini + zod)
   api/tts/route.ts              # ElevenLabs TTS proxy (streams audio, hides key)
-  api/stt/route.ts              # ElevenLabs Scribe proxy (WAV segment -> text)
-components/  CodeEditor, TranscriptPanel, VadIndicator, HintButton, Timer, VoicePicker, Scorecard,
+  api/stt/route.ts              # ElevenLabs Scribe proxy (recorded audio -> text)
+components/  CodeEditor, TranscriptPanel, MicButton, HintButton, Timer, VoicePicker, Scorecard,
              CustomQuestionForm, ProblemPreview, MyQuestionsList
 lib/
   gemini.ts                     # client + JSON-mode helper
   prompts.ts                    # interviewer persona/tone, hint, review rubric prompts
   interjection.ts               # InterjectionController (triggers + cooldowns)
-  voice.ts                      # MicVAD setup, echo guard, barge-in, WAV encoding, TTS playback queue
+  voice.ts                      # click-to-talk MediaRecorder, barge-in, TTS playback queue
   session.ts                    # session state (zustand) + localStorage persistence
   customQuestions.ts            # "My questions" store (zustand persist)
   elevenlabs.ts
@@ -130,7 +135,7 @@ Session state lives on the client (zustand plus localStorage), so no database is
 1. **Skeleton:** Next.js, Tailwind, the setup page, a Monaco room with a static problem. ✅ Done.
 2. **Text interviewer:** the Gemini interviewer route and prompts, a typed debug input feeding the transcript, the hint button with the ladder.
 3. **Custom questions:** the Topic / Custom toggle, the paste form, `/api/problem/parse`, the editable preview card and the My questions library. ✅ Built (needs a live Gemini test).
-4. **Voice:** ElevenLabs TTS for interviewer replies, a voice and tone picker, then the always-on mic with VAD, Scribe STT, echo guard and barge-in.
+4. **Voice:** ElevenLabs TTS for interviewer replies, a voice and tone picker, then the click-to-talk mic button, Scribe STT and barge-in.
 5. **Interjection controller:** triggers, cooldowns and `speak:false` handling.
 6. **Review:** the scoring route and the scorecard page.
 7. **Polish:** intro overview, problem bank fill-out, custom topic generation.
@@ -145,7 +150,7 @@ Steps 1 and 3 are done. The remaining work is split so that nobody blocks anyone
 | --- | --- | --- |
 | **A** | Frontend | Every page and component: `app/page.tsx`, `components/*`, the interview room layout and the review page UI |
 | **B** | AI interviewer | `/api/interviewer`, `/api/hint`, `lib/prompts.ts` (persona and tone), `lib/interjection.ts` |
-| **C** | Voice | `/api/tts`, `/api/stt`, `lib/voice.ts` (VAD, Scribe, echo guard, barge-in, TTS playback queue) |
+| **C** | Voice | `/api/tts`, `/api/stt`, `lib/voice.ts` (click-to-talk recording, Scribe, barge-in, TTS playback queue) |
 | **D** | Content, review and ship | Filling out the problem bank, `/api/problem/generate`, `/api/review`, live testing of custom questions, deploy, demo; the optional extras if there's time |
 
 ### Interfaces to agree on first (hour 0–1, all 4 people)
@@ -157,8 +162,8 @@ Put these types in `lib/types.ts`, and have each owner add a mock that returns f
   - Request: `{ problem, code, transcript, hintLevel }`
   - Response: `{ message }`
 - **`useVoice({ voiceId, onUtterance })`** (C), a React hook
-  - Returns `{ state: VadState, start(), speak(text): Promise<void>, stop() }`
-  - `VadState` already exists in `components/VadIndicator.tsx`. `onUtterance(text)` fires with each transcribed candidate turn.
+  - Returns `{ state: MicState, toggleRecording(), speak(text): Promise<void>, stopSpeaking() }`
+  - `MicState = "idle" | "recording" | "thinking" | "interviewer"` (in `components/MicButton.tsx`). `toggleRecording()` is the mic button's click handler: the first call starts recording, the second stops it and transcribes. `onUtterance(text)` fires with each transcribed candidate turn.
 - **`InterjectionController`** (B)
   - Inputs, one call per event: `onUtterance(text)`, `onCodeChange(code)`, `onHintRequest()`, `onDone()`, `onSpeakingChange(bool)`
   - Output: an `onInterject(message)` callback. The room passes that message to `voice.speak` and appends it to the transcript.
@@ -171,7 +176,7 @@ Put these types in `lib/types.ts`, and have each owner add a mock that returns f
 - **Interview room:**
   - a typed debug input feeding the transcript, until voice lands
   - a loading state on the hint button
-  - the VAD indicator driven by `useVoice().state`
+  - the mic button (`components/MicButton.tsx`, already stubbed): pass `useVoice().toggleRecording()` as `onClick` and `useVoice().state` as `state`; it disables itself while "thinking"
   - a mic permission prompt and an error state for when the mic is blocked
   - an "interviewer is thinking…" indicator
 - **Intro / overview screen** before the timer starts, with a "Ready" button. It also gives the browser the click it needs before audio can autoplay.
@@ -194,15 +199,14 @@ Put these types in `lib/types.ts`, and have each owner add a mock that returns f
 
 **C: Voice**
 - **`/api/tts`:** ElevenLabs streaming TTS proxy, `{ text, voiceId }` → audio stream. It also serves A's voice previews.
-- **`/api/stt`:** ElevenLabs Scribe proxy, WAV → `{ text }`.
+- **`/api/stt`:** ElevenLabs Scribe proxy, recorded audio blob (multipart) → `{ text }`.
 - **`lib/voice.ts` / `useVoice`:**
-  - an always-on `MicVAD` with `echoCancellation` on
-  - WAV encoding of each speech segment
+  - click-to-talk: `toggleRecording()` starts `MediaRecorder` on the first click and stops it on the second, releasing the mic
+  - drop recordings under about 300ms or with empty transcripts
   - a TTS playback queue
-  - barge-in: stop TTS when `onSpeechStart` fires
-  - the echo guard: ignore segments under 600ms and raise the threshold while TTS plays
-- **Tuning:** `redemptionFrames` and `minSpeechFrames`, tested on speakers *and* headphones.
-- **Latency:** stream TTS so audio starts within about 1s, and measure end-to-end turn latency.
+  - barge-in: stop TTS when recording starts
+- **Testing:** check on speakers *and* headphones, and in Chrome and Safari (their `MediaRecorder` formats differ, so confirm Scribe accepts both).
+- **Latency:** stream TTS so audio starts within about 1s, and measure end-to-end turn latency (second click → first interviewer audio).
 
 **D: Content, review and ship**
 - **Problem bank:**
@@ -225,7 +229,7 @@ Put these types in `lib/types.ts`, and have each owner add a mock that returns f
 | 8 | **Integration checkpoint 1:** a text interview works end to end (typed input, Gemini replies, hints) |
 | 8–14 | C's voice goes into the room, and B's interjection controller gets hooked up. A builds the review page against the mock `Scorecard`. |
 | 14 | **Integration checkpoint 2:** a full voice interview through to a real scorecard |
-| 14–20 | Tuning (VAD, how often the interviewer interjects, prompts), problem bank, polish, deploy |
+| 14–20 | Tuning (turn latency, how often the interviewer interjects, prompts), problem bank, polish, deploy |
 | 20–24 | Feature freeze, bug fixes, demo rehearsal, Devpost |
 
 ### Working agreements
@@ -239,11 +243,11 @@ Put these types in `lib/types.ts`, and have each owner add a mock that returns f
 ## Verification
 - `npm run dev`, then go from the setup page into an Easy Two Pointers interview and grant mic permission.
 - Confirm the interviewer reads the overview and problem aloud and that the voice and tone change with the selection.
-- With the mic always on, speak and confirm:
-  - the VAD indicator switches to "speaking"
-  - the utterance shows up in the transcript after you stop
-  - the interviewer's own audio does **not** produce transcript entries (use speakers, not headphones, to test echo)
-- Start talking while the interviewer is speaking and confirm TTS stops (barge-in).
+- Click the mic button, ask a clarifying question, click again, and confirm:
+  - the button shows "recording" after the first click and "thinking" after the second
+  - your words show up in the transcript, then the interviewer's reply, then the reply is played aloud
+  - a quick double-click doesn't create an empty turn
+- Click the mic while the interviewer is speaking and confirm TTS stops (barge-in).
 - Talk through a wrong approach and confirm a probe arrives, with no more than one probe per about 90s while typing continuously.
 - Ask "can I get a hint?" out loud and press the Hint button. Confirm the hints escalate, starting with a concrete example input.
 - Submit buggy code with "I'm done" and confirm the review flags the bug or missed edge case and shows scores, a hint penalty and key moments.
