@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSessionStore, useStoreHydrated } from "@/lib/session";
@@ -9,7 +9,19 @@ import { ProblemPanel } from "@/components/ProblemPanel";
 import { CodeEditor } from "@/components/CodeEditor";
 import { Timer } from "@/components/Timer";
 import { TranscriptPanel } from "@/components/TranscriptPanel";
-import { MicButton } from "@/components/MicButton";
+import { CameraPreview } from "@/components/CameraPreview";
+import { InterviewerPanel } from "@/components/InterviewerPanel";
+import { ResizeHandle } from "@/components/ResizeHandle";
+
+const LEFT_MIN = 220;
+const LEFT_MAX = 640;
+const RIGHT_MIN = 260;
+const RIGHT_MAX = 600;
+const RIGHT_DEFAULT = 360;
+// Dragging the interviewer panel narrower than this hides it.
+const RIGHT_HIDE_BELOW = 150;
+
+const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
 export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -20,6 +32,12 @@ export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
   const addTranscript = useSessionStore((s) => s.addTranscript);
   const recordHint = useSessionStore((s) => s.recordHint);
   const endSession = useSessionStore((s) => s.endSession);
+
+  // Panel widths in px (desktop layout). The editor takes whatever is left.
+  const [leftWidth, setLeftWidth] = useState(340);
+  const [rightWidth, setRightWidth] = useState(RIGHT_DEFAULT);
+  const [interviewerHidden, setInterviewerHidden] = useState(false);
+  const dragStartWidth = useRef(0);
 
   if (!hydrated) return null;
 
@@ -44,6 +62,20 @@ export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
     addTranscript(id, { role: "interviewer", text: problem.hintLadder[session.hintsUsed] });
     recordHint(id);
   }
+
+  function dragInterviewer(dx: number) {
+    const width = dragStartWidth.current - dx;
+    if (width < RIGHT_HIDE_BELOW) {
+      setInterviewerHidden(true);
+    } else {
+      setInterviewerHidden(false);
+      setRightWidth(clamp(width, RIGHT_MIN, RIGHT_MAX));
+    }
+  }
+
+  const columns = interviewerHidden
+    ? `${leftWidth}px 9px minmax(0,1fr) 30px`
+    : `${leftWidth}px 9px minmax(0,1fr) 9px ${rightWidth}px`;
 
   function finish() {
     endSession(id);
@@ -73,12 +105,28 @@ export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_2fr_320px]">
-        <aside className="min-h-0 overflow-y-auto border-zinc-800 p-5 lg:border-r">
-          <ProblemPanel problem={problem} />
+      <div
+        className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-(--room-columns)"
+        style={{ "--room-columns": columns } as React.CSSProperties}
+      >
+        <aside className="flex min-h-0 min-w-0 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <ProblemPanel problem={problem} />
+          </div>
+          <div className="p-4 pt-2">
+            <div className="max-w-[230px]">
+              <CameraPreview />
+            </div>
+          </div>
         </aside>
 
-        <section className="min-h-[400px] lg:min-h-0">
+        <ResizeHandle
+          label="Resize problem panel"
+          onDragStart={() => (dragStartWidth.current = leftWidth)}
+          onDrag={(dx) => setLeftWidth(clamp(dragStartWidth.current + dx, LEFT_MIN, LEFT_MAX))}
+        />
+
+        <section className="min-h-[400px] min-w-0 lg:min-h-0">
           <CodeEditor
             language={config.language}
             value={session.code}
@@ -86,11 +134,48 @@ export function InterviewRoom({ params }: { params: Promise<{ id: string }> }) {
           />
         </section>
 
-        <aside className="flex min-h-0 flex-col border-zinc-800 lg:border-l">
-          <div className="border-b border-zinc-800 px-4 py-3">
-            {/* Click-to-talk mic. Wired to useVoice() in milestone 4. */}
-            <MicButton state="idle" />
+        {interviewerHidden ? (
+          // Collapsed interviewer: click the tab, or drag it left, to bring it back.
+          <ResizeHandle
+            label="Show interviewer"
+            onDragStart={() => (dragStartWidth.current = 0)}
+            onDrag={dragInterviewer}
+            onClick={() => setInterviewerHidden(false)}
+            className="border-l border-zinc-800 bg-zinc-900 hover:bg-zinc-800"
+          >
+            <span className="m-auto flex items-center gap-2 text-xs text-zinc-300 [writing-mode:vertical-rl]">
+              <span aria-hidden>‹</span> Interviewer
+            </span>
+          </ResizeHandle>
+        ) : (
+          <ResizeHandle
+            label="Resize interviewer panel"
+            onDragStart={() => (dragStartWidth.current = rightWidth)}
+            onDrag={dragInterviewer}
+          />
+        )}
+
+        {/* Kept mounted while hidden so the interviewer's state carries on. */}
+        <aside className={`min-h-0 min-w-0 flex-col ${interviewerHidden ? "flex lg:hidden" : "flex"}`}>
+          <div className="relative border-b border-zinc-800">
+            <button
+              type="button"
+              onClick={() => setInterviewerHidden(true)}
+              title="Hide the interviewer for more coding space"
+              className="absolute right-2 top-2 z-10 hidden rounded px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 lg:block"
+            >
+              Hide <span aria-hidden>›</span>
+            </button>
+            <InterviewerPanel
+              voiceId={config.voiceId}
+              tone={config.tone}
+              transcript={session.transcript}
+              startedAt={session.startedAt}
+            />
           </div>
+          <p className="px-4 pt-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            Transcript
+          </p>
           <div className="min-h-0 flex-1 overflow-y-auto">
             <TranscriptPanel transcript={session.transcript} />
           </div>
