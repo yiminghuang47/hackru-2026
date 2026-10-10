@@ -24,12 +24,14 @@ registerHooks({
 let calls = [];
 let modelReply;
 let providerError;
+let failOnce;
 const originalKey = process.env.GEMINI_API_KEY;
 
 mock.module(new URL("lib/gemini.ts", root).href, {
   namedExports: {
     generateJson: async (options) => {
       calls.push(options);
+      if (failOnce) { const error = failOnce; failOnce = undefined; throw error; }
       if (providerError) throw providerError;
       // Match the real helper's contract: malformed model output must fail Zod.
       return options.schema.parse(modelReply);
@@ -66,6 +68,7 @@ beforeEach(() => {
   calls = [];
   modelReply = { reply: "Yes, the array is sorted in ascending order." };
   providerError = undefined;
+  failOnce = undefined;
 });
 
 after(() => {
@@ -176,6 +179,32 @@ test("provider failures do not leak upstream details", async () => {
   const data = await res.json();
   assert.equal(data.ok, false);
   assert.doesNotMatch(data.reason, /SECRET/);
+});
+
+test("retries a temporary Gemini failure before returning the single reply", async () => {
+  failOnce = Object.assign(new Error("temporary private provider detail"), { status: 503 });
+  const res = await POST(request());
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true, reply: modelReply.reply });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].prompt, calls[1].prompt);
+  assert.ok(calls[0].signal instanceof AbortSignal);
+  assert.notEqual(calls[0].signal, calls[1].signal);
+});
+
+test("explains the daily quota reset without retrying or leaking provider details", async () => {
+  providerError = Object.assign(new Error(JSON.stringify({ error: {
+    message: "PRIVATE per_day quota exceeded", details: [{
+      "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: "5133s",
+    }],
+  } })), { status: 429 });
+  const res = await POST(request());
+  assert.equal(res.status, 503);
+  const { reason } = await res.json();
+  assert.match(reason, /daily request limit/);
+  assert.match(reason, /86 minutes/);
+  assert.doesNotMatch(reason, /PRIVATE/);
+  assert.equal(calls.length, 1);
 });
 
 test("invalid model replies return a recoverable error", async () => {

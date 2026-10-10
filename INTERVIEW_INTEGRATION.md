@@ -9,6 +9,10 @@
 
 If automatic playback is blocked, click **Play reply**. A failed Gemini request offers **Retry reply** without duplicating your transcript. Failed speech can be retried without generating another Gemini reply. Typed input also works when microphone access is unavailable.
 
+Temporary Gemini failures now retry automatically up to twice with short increasing delays. Each attempt has a 15-second timeout; cancellation stops pending calls and retries. Authentication and invalid-request errors are not retried. Server diagnostics include only error category, numeric HTTP status, and attempt count, without prompts, credentials, or raw provider errors. Manual retry remains available if all attempts fail.
+
+Rate limits (HTTP 429) wait about 3 seconds before the first retry and 6 seconds before the second, plus jitter, respecting longer provider retry hints when they fit within the request deadline. Other temporary failures use shorter delays. Daily quotas are not retried: the UI explains the quota and shows the provider's suggested wait when available. Automatic retries cannot remove provider quotas.
+
 ## API flow
 
 `Microphone → POST /api/stt → candidate text → POST /api/interviewer → reply → POST /api/tts → browser audio`
@@ -35,7 +39,7 @@ Open http://127.0.0.1:3000. Microphone recording requires localhost or HTTPS. Th
 ## Verification
 
 - Production build and TypeScript passed.
-- 30 automated tests passed: interviewer, TTS, and conversation sequencing, cancellation, retries, and autoplay handling.
+- 40 automated tests passed: interviewer, TTS, conversation sequencing, cancellation, automatic and manual retries, quota handling, and autoplay handling.
 - Actual browser: opening question, typed follow-up, selected-voice playback, and stopping playback worked.
 - Live HTTP: an existing generated MP3 was transcribed through `/api/stt`, its exact transcript went to `/api/interviewer`, and the exact reply went to `/api/tts`. All returned HTTP 200 with nonempty audio.
 - Physical microphone capture and speaking into the device still need a user test; the live STT check used a generated audio file.
@@ -43,5 +47,5 @@ Open http://127.0.0.1:3000. Microphone recording requires localhost or HTTPS. Th
 Run the automated checks on Node 24+:
 
 ```sh
-node --experimental-test-module-mocks --test tests/interviewer.test.mjs tests/tts.test.mjs tests/conversation.test.mjs
+node --experimental-test-module-mocks --test tests/interviewer.test.mjs tests/interviewer-retry.test.mjs tests/tts.test.mjs tests/conversation.test.mjs
 ```

@@ -22,11 +22,13 @@ export async function generateJson<T extends z.ZodType>({
   prompt,
   schema,
   temperature = 0.4,
+  signal,
 }: {
   system: string;
   prompt: string;
   schema: T;
   temperature?: number;
+  signal?: AbortSignal;
 }): Promise<z.infer<T>> {
   // Gemini rejects the "$schema" keyword, so drop it from zod's output.
   const jsonSchema: Record<string, unknown> = z.toJSONSchema(schema, { target: "draft-2020-12" });
@@ -40,10 +42,11 @@ export async function generateJson<T extends z.ZodType>({
       responseMimeType: "application/json",
       responseJsonSchema: jsonSchema,
       temperature,
+      abortSignal: signal,
     },
   });
 
   const text = res.text;
-  if (!text) throw new Error("Gemini returned an empty response.");
+  if (!text) throw new SyntaxError("Gemini returned an empty response.");
   return schema.parse(JSON.parse(text));
 }

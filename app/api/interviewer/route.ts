@@ -5,6 +5,7 @@ import {
   type InterviewerResponse,
 } from "@/lib/interviewer";
 import { interviewerPrompt, interviewerSystemPrompt } from "@/lib/interviewer-prompts";
+import { interviewerFailure, withInterviewerRetry } from "@/lib/interviewer-retry";
 
 export const maxDuration = 60;
 
@@ -65,15 +66,25 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await generateJson({
+    const result = await withInterviewerRetry((signal) => generateJson({
       system: interviewerSystemPrompt(parsed.data.tone),
       prompt: interviewerPrompt(parsed.data),
       schema: InterviewerReplySchema,
       temperature: 0.4,
-    });
+      signal,
+    }), request.signal);
     return respond({ ok: true, reply: result.reply });
-  } catch {
+  } catch (error) {
     // Do not expose provider errors, credentials, or candidate code/transcripts.
+    if (request.signal.aborted) return respond({ ok: false, reason: "Interview turn cancelled." }, 499);
+    const failure = interviewerFailure(error);
+    if (failure.category === "daily_quota") {
+      const wait = failure.retryAfterSeconds ? ` Try again in about ${Math.ceil(failure.retryAfterSeconds / 60)} minutes.` : " Try again after the quota resets.";
+      return respond({ ok: false, reason: `Gemini's daily request limit has been reached.${wait}` }, 503);
+    }
+    if (failure.status === 429) {
+      return respond({ ok: false, reason: "The interviewer is receiving too many requests. Wait a moment, then try again." }, 503);
+    }
     return respond({ ok: false, reason: "The interviewer couldn't respond. Please try again." }, 502);
   }
 }
