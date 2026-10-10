@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Problem, Session, SessionConfig, TranscriptEntry } from "./types";
+import type { Scorecard } from "./scorecard";
 import { pickProblem } from "./problems";
 
 type SessionStore = {
@@ -14,6 +15,7 @@ type SessionStore = {
   addTranscript: (id: string, entry: Omit<TranscriptEntry, "at">) => void;
   recordHint: (id: string) => void;
   endSession: (id: string) => void;
+  setScorecard: (id: string, scorecard: Scorecard) => void;
 };
 
 export const useSessionStore = create<SessionStore>()(
@@ -49,6 +51,7 @@ export const useSessionStore = create<SessionStore>()(
           })),
         recordHint: (id) => patch(id, (s) => ({ hintsUsed: s.hintsUsed + 1 })),
         endSession: (id) => patch(id, (s) => ({ endedAt: s.endedAt ?? Date.now() })),
+        setScorecard: (id, scorecard) => patch(id, () => ({ scorecard })),
       };
     },
     { name: "interview-sessions" },
